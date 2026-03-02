@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OCR (RU/EN/FR/DE) — Handwriting → Text</title>
+
+  <style>
+    body { font-family: system-ui, Arial; margin: 24px; max-width: 980px; }
+    .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+    .card { border:1px solid #ddd; border-radius:14px; padding:16px; flex:1; min-width:320px; }
+    img { max-width:100%; border-radius:12px; border:1px solid #eee; }
+    textarea { width:100%; min-height:260px; padding:12px; border-radius:12px; border:1px solid #ddd; font-size:14px; }
+    button { padding:10px 14px; border-radius:10px; border:1px solid #ccc; background:#fff; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .status { margin-top:10px; color:#444; white-space:pre-wrap; }
+    dialog { border:1px solid #ddd; border-radius:14px; padding:16px; }
+    dialog::backdrop { background: rgba(0,0,0,.25); }
+    .dlg-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    .hint { color:#666; font-size:13px; line-height:1.35; }
+    code { background:#f6f6f6; padding:2px 6px; border-radius:6px; }
+  </style>
+</head>
+
+<body>
+  <h1>OCR: рукописный/печатный → печатный текст (RU/EN/FR/DE)</h1>
+  <p class="hint">
+    Приложение статическое (GitHub Pages). Распознавание делает Cloudflare Worker, который хранит ключи и вызывает OCR API.
+  </p>
+
+  <div class="row">
+    <div class="card">
+      <h3>1) Загрузить изображение</h3>
+
+      <!--
+        Одна “главная” кнопка — при нажатии открываем диалог с 2 вариантами:
+        - загрузка из файлов
+        - фото с камеры (на телефоне откроется камера)
+      -->
+      <button id="chooseBtn">Загрузить / Сфоткать</button>
+      <button id="runBtn" disabled>Распознать</button>
+      <button id="clearBtn">Очистить</button>
+
+      <div class="status" id="status"></div>
+
+      <div style="margin-top:12px">
+        <img id="preview" alt="preview" />
+      </div>
+
+      <!-- Скрытые input’ы: один обычный, один с capture для камеры -->
+      <input id="fileInput" type="file" accept="image/*" hidden />
+      <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden />
+
+      <!-- Диалог выбора “файл или камера” -->
+      <dialog id="pickDialog">
+        <h3 style="margin:0 0 6px 0;">Выбери источник</h3>
+        <div class="hint">
+          На телефоне “Сфоткать” обычно открывает камеру. На компьютере оба пункта могут открыть файловый выбор.
+        </div>
+        <div class="dlg-actions">
+          <button id="pickFileBtn">Загрузить из файлов</button>
+          <button id="pickCameraBtn">Сфоткать</button>
+          <button id="cancelPickBtn">Отмена</button>
+        </div>
+      </dialog>
+
+      <hr style="margin:16px 0; border:none; border-top:1px solid #eee;" />
+      <div class="hint">
+        Подсказки для качества:
+        <ul>
+          <li>ровно, без бликов и теней</li>
+          <li>высокий контраст (тёмный текст на светлом фоне)</li>
+          <li>не слишком далеко (чтобы буквы были крупные)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>2) Печатный результат</h3>
+      <textarea id="out" placeholder="Тут появится распознанный текст..."></textarea>
+
+      <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="copyBtn">Copy</button>
+        <button id="downloadBtn">Скачать .txt</button>
+      </div>
+
+      <p class="hint" style="margin-top:12px;">
+        Языки: RU / EN / FR / DE. Обычно OCR сам детектит язык на строках.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * === НАСТРОЙКА ===
+     * Вставь URL своего Cloudflare Worker endpoint.
+     * Например: https://my-ocr-worker.myname.workers.dev/ocr
+     */
+    const WORKER_OCR_URL = "https://damp-cloud-01fa.andruhya.workers.dev/ocr";
+
+    const chooseBtn = document.getElementById('chooseBtn');
+    const runBtn = document.getElementById('runBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusEl = document.getElementById('status');
+    const previewEl = document.getElementById('preview');
+    const outEl = document.getElementById('out');
+
+    const fileInput = document.getElementById('fileInput');
+    const cameraInput = document.getElementById('cameraInput');
+
+    const pickDialog = document.getElementById('pickDialog');
+    const pickFileBtn = document.getElementById('pickFileBtn');
+    const pickCameraBtn = document.getElementById('pickCameraBtn');
+    const cancelPickBtn = document.getElementById('cancelPickBtn');
+
+    const copyBtn = document.getElementById('copyBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    // Здесь храним текущий выбранный файл/картинку
+    let currentFile = null;
+
+    // === UI: показать диалог выбора источника ===
+    chooseBtn.addEventListener('click', () => {
+      pickDialog.showModal();
+    });
+
+    pickFileBtn.addEventListener('click', () => {
+      pickDialog.close();
+      fileInput.click();
+    });
+
+    pickCameraBtn.addEventListener('click', () => {
+      pickDialog.close();
+      cameraInput.click();
+    });
+
+    cancelPickBtn.addEventListener('click', () => {
+      pickDialog.close();
+    });
+
+    // === Когда пользователь выбрал файл (обычный или камера) ===
+    fileInput.addEventListener('change', onPickedFile);
+    cameraInput.addEventListener('change', onPickedFile);
+
+    async function onPickedFile(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      // Сохраняем файл, включаем кнопку распознавания
+      currentFile = file;
+      runBtn.disabled = false;
+
+      // Показываем preview через dataURL
+      previewEl.src = await fileToDataUrl(file);
+
+      statusEl.textContent = `Выбрано изображение: ${file.name || "(camera)"}\nНажми “Распознать”.`;
+    }
+
+    // === Запуск OCR ===
+    runBtn.addEventListener('click', async () => {
+      if (!currentFile) return;
+
+      runBtn.disabled = true;
+      statusEl.textContent = "Отправляю изображение в OCR…";
+
+      try {
+        // Отправляем бинарник напрямую в Worker
+        // Важно: Content-Type ставим как у файла (image/jpeg, image/png, ...)
+        const resp = await fetch(WORKER_OCR_URL, {
+          method: "POST",
+          headers: { "Content-Type": currentFile.type || "application/octet-stream" },
+          body: await currentFile.arrayBuffer(),
+        });
+
+        if (!resp.ok) {
+          const errText = await safeText(resp);
+          throw new Error(`Worker error ${resp.status}: ${errText}`);
+        }
+
+        /**
+         * Ожидаем JSON:
+         * {
+         *   text: "распознанный текст ...",
+         *   lines: ["строка1", "строка2", ...] // опционально
+         * }
+         */
+        const data = await resp.json();
+
+        outEl.value = (data.text || "").trim();
+        statusEl.textContent = "Готово ✅";
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "Ошибка OCR ❌\n" + (err?.message || String(err));
+      } finally {
+        runBtn.disabled = false;
+      }
+    });
+
+    // === Очистка ===
+    clearBtn.addEventListener('click', () => {
+      currentFile = null;
+      previewEl.src = "";
+      outEl.value = "";
+      statusEl.textContent = "";
+      runBtn.disabled = true;
+
+      // сбрасываем инпуты, чтобы выбор того же файла снова сработал
+      fileInput.value = "";
+      cameraInput.value = "";
+    });
+
+    // === Copy / Download ===
+    copyBtn.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(outEl.value || "");
+      statusEl.textContent = "Скопировано в буфер.";
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      const blob = new Blob([outEl.value || ""], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = "recognized.txt";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      statusEl.textContent = "Файл скачан.";
+    });
+
+    // === helpers ===
+    function fileToDataUrl(file) {
+      return new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+    }
+
+    async function safeText(resp) {
+      try { return await resp.text(); } catch { return ""; }
+    }
+  </script>
+</body>
+</html>
