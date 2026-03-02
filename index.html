@@ -64,9 +64,9 @@
         На телефоне “Сфоткать” обычно открывает камеру. На компьютере оба пункта могут открыть файловый выбор.
         </div>
         <div class="dlg-actions">
-          <button id="pickFileBtn"  data-i18n="Load from files">Загрузить из файлов</button>
-          <button id="pickCameraBtn"  data-i18n="Make a photo">Сфоткать</button>
-          <button id="cancelPickBtn"  data-i18n="Cancel">Отмена</button>
+          <button id="pickFileBtn"  data-i18n="loadFiles">Загрузить из файлов</button>
+          <button id="pickCameraBtn"  data-i18n="takePhoto">Сфоткать</button>
+          <button id="cancelPickBtn"  data-i18n="cancel">Отмена</button>
         </div>
       </dialog>
 
@@ -83,7 +83,7 @@
     </div>
 
     <div class="card">
-      <h3>2) Печатный результат</h3>
+      <h3 data-i18n="resultTitle">2) Печатный результат</h3>
       <textarea id="out" data-i18n-placeholder="textareaPlaceholder"
       placeholder="Тут появится распознанный текст..."></textarea>
 
@@ -160,20 +160,21 @@
       statusEl.textContent = `Выбрано изображение: ${file.name || "(camera)"}\nНажми “Распознать”.`;
     }
 
-    // === Запуск OCR ===
-    runBtn.addEventListener('click', async () => {
+// === Запуск OCR ===
+runBtn.addEventListener('click', async () => {
       if (!currentFile) return;
 
       runBtn.disabled = true;
       statusEl.textContent = "Отправляю изображение в OCR…";
 
       try {
-        // Отправляем бинарник напрямую в Worker
-        // Важно: Content-Type ставим как у файла (image/jpeg, image/png, ...)
-        const resp = await fetch(WORKER_OCR_URL, {
+        const lang = "ru"; // "auto" | "ru" | "en" | "fr" | "de"
+        const body = await currentFile.arrayBuffer(); // ✅ один раз
+
+        const resp = await fetch(`${WORKER_OCR_URL}?lang=${encodeURIComponent(lang)}`, {
           method: "POST",
           headers: { "Content-Type": currentFile.type || "application/octet-stream" },
-          body: await currentFile.arrayBuffer(),
+          body,
         });
 
         if (!resp.ok) {
@@ -181,13 +182,6 @@
           throw new Error(`Worker error ${resp.status}: ${errText}`);
         }
 
-        /**
-         * Ожидаем JSON:
-         * {
-         *   text: "распознанный текст ...",
-         *   lines: ["строка1", "строка2", ...] // опционально
-         * }
-         */
         const data = await resp.json();
 
         outEl.value = (data.text || "").trim();
@@ -199,6 +193,7 @@
         runBtn.disabled = false;
       }
     });
+
 
     // === Очистка ===
     clearBtn.addEventListener('click', () => {
