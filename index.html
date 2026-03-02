@@ -171,7 +171,7 @@ runBtn.addEventListener('click', async () => {
         const lang = "ru"; // "auto" | "ru" | "en" | "fr" | "de"
         const body = await currentFile.arrayBuffer(); // ✅ один раз
 
-        const resp = await fetch(`${WORKER_OCR_URL}?lang=${encodeURIComponent(lang)}`, {
+       const resp = await fetch(`${WORKER_OCR_URL}?lang=ru`, {
           method: "POST",
           headers: { "Content-Type": currentFile.type || "application/octet-stream" },
           body,
