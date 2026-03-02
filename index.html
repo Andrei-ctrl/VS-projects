@@ -23,23 +23,29 @@
 </head>
 
 <body>
-  <h1>OCR: рукописный/печатный → печатный текст (RU/EN/FR/DE)</h1>
-  <p class="hint">
-    Приложение статическое (GitHub Pages). Распознавание делает Cloudflare Worker, который хранит ключи и вызывает OCR API.
+  <h1 data-i18n="title">
+  OCR: рукописный/печатный → печатный текст (RU/EN/FR/DE)
+  </h1>
+  <div style="margin-bottom:15px;">
+  <button id="langToggle">EN</button>
+  </div>
+  <p class="hint" data-i18n="description">
+  Приложение статическое (GitHub Pages). Распознавание делает Cloudflare Worker, который хранит ключи и вызывает OCR API.
   </p>
+
 
   <div class="row">
     <div class="card">
-      <h3>1) Загрузить изображение</h3>
+      <h3 data-i18n="uploadTitle">1. Загрузить изображение</h3>
 
       <!--
         Одна “главная” кнопка — при нажатии открываем диалог с 2 вариантами:
         - загрузка из файлов
         - фото с камеры (на телефоне откроется камера)
       -->
-      <button id="chooseBtn">Загрузить / Сфоткать</button>
-      <button id="runBtn" disabled>Распознать</button>
-      <button id="clearBtn">Очистить</button>
+      <button id="chooseBtn" data-i18n="choose">Загрузить / Сфоткать</button>
+      <button id="runBtn" disabled data-i18n="recognize">Распознать</button>
+      <button id="clearBtn" data-i18n="clear">Очистить</button>
 
       <div class="status" id="status"></div>
 
@@ -53,49 +59,47 @@
 
       <!-- Диалог выбора “файл или камера” -->
       <dialog id="pickDialog">
-        <h3 style="margin:0 0 6px 0;">Выбери источник</h3>
-        <div class="hint">
-          На телефоне “Сфоткать” обычно открывает камеру. На компьютере оба пункта могут открыть файловый выбор.
+        <h3 data-i18n="resultTitle">2. Печатный результат</h3>
+        <div class="hint" data-i18n="cameraHint">
+        На телефоне “Сфоткать” обычно открывает камеру. На компьютере оба пункта могут открыть файловый выбор.
         </div>
         <div class="dlg-actions">
-          <button id="pickFileBtn">Загрузить из файлов</button>
-          <button id="pickCameraBtn">Сфоткать</button>
-          <button id="cancelPickBtn">Отмена</button>
+          <button id="pickFileBtn"  data-i18n="Load from files">Загрузить из файлов</button>
+          <button id="pickCameraBtn"  data-i18n="Make a photo">Сфоткать</button>
+          <button id="cancelPickBtn"  data-i18n="Cancel">Отмена</button>
         </div>
       </dialog>
 
       <hr style="margin:16px 0; border:none; border-top:1px solid #eee;" />
       <div class="hint">
-        Подсказки для качества:
-        <ul>
-          <li>ровно, без бликов и теней</li>
-          <li>высокий контраст (тёмный текст на светлом фоне)</li>
-          <li>не слишком далеко (чтобы буквы были крупные)</li>
-        </ul>
+      <span data-i18n="qualityTipsTitle">Подсказки для качества:</span>
+      <ul>
+      <li data-i18n="tip1">ровно, без бликов и теней</li>
+      <li data-i18n="tip2">высокий контраст (тёмный текст на светлом фоне)</li>
+      <li data-i18n="tip3">не слишком далеко (чтобы буквы были крупные)</li>
+      </ul>
       </div>
+
     </div>
 
     <div class="card">
       <h3>2) Печатный результат</h3>
-      <textarea id="out" placeholder="Тут появится распознанный текст..."></textarea>
+      <textarea id="out" data-i18n-placeholder="textareaPlaceholder"
+      placeholder="Тут появится распознанный текст..."></textarea>
 
       <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-        <button id="copyBtn">Copy</button>
-        <button id="downloadBtn">Скачать .txt</button>
+        <button id="copyBtn" data-i18n="copy">Copy</button>
+        <button id="downloadBtn" data-i18n="download">Скачать .txt</button>
       </div>
 
-      <p class="hint" style="margin-top:12px;">
-        Языки: RU / EN / FR / DE. Обычно OCR сам детектит язык на строках.
+      <p class="hint" data-i18n="languagesInfo">
+      Языки: RU / EN / FR / DE. Обычно OCR сам детектит язык на строках.
       </p>
     </div>
   </div>
 
   <script>
-    /**
-     * === НАСТРОЙКА ===
-     * Вставь URL своего Cloudflare Worker endpoint.
-     * Например: https://my-ocr-worker.myname.workers.dev/ocr
-     */
+    //Cloudflare Worker endpoint.
     const WORKER_OCR_URL = "https://damp-cloud-01fa.andruhya.workers.dev/ocr";
 
     const chooseBtn = document.getElementById('chooseBtn');
@@ -238,6 +242,102 @@
     async function safeText(resp) {
       try { return await resp.text(); } catch { return ""; }
     }
+
+// =====================
+// 🌍 FULL i18n system
+// =====================
+
+let currentLang = "ru";
+
+const translations = {
+  ru: {
+    title: "OCR: рукописный/печатный → печатный текст (RU/EN/FR/DE)",
+    description: "Приложение статическое (GitHub Pages). Распознавание делает Cloudflare Worker, который хранит ключи и вызывает OCR API.",
+    uploadTitle: "1) Загрузить изображение",
+    resultTitle: "2) Печатный результат",
+    chooseSource: "Выбери источник",
+    cameraHint: "На телефоне «Сфоткать» обычно открывает камеру. На компьютере оба пункта могут открыть файловый выбор.",
+    choose: "Загрузить / Сфоткать",
+    recognize: "Распознать",
+    clear: "Очистить",
+    copy: "Копировать",
+    download: "Скачать .txt",
+    cancel: "Отмена",
+    loadFiles: "Загрузить из файлов",
+    takePhoto: "Сфоткать",
+    qualityTipsTitle: "Подсказки для качества:",
+    tip1: "ровно, без бликов и теней",
+    tip2: "высокий контраст (тёмный текст на светлом фоне)",
+    tip3: "не слишком далеко (чтобы буквы были крупные)",
+    textareaPlaceholder: "Тут появится распознанный текст...",
+    languagesInfo: "Языки: RU / EN / FR / DE. Обычно OCR сам детектит язык на строках.",
+    selectedImage: "Выбрано изображение:",
+    clickRecognize: "Нажми «Распознать».",
+    sending: "Отправляю изображение в OCR…",
+    done: "Готово ✅",
+    error: "Ошибка OCR ❌",
+    copied: "Скопировано в буфер.",
+    downloaded: "Файл скачан."
+  },
+  en: {
+    title: "OCR: Handwritten/Printed → Digital Text (RU/EN/FR/DE)",
+    description: "This is a static app (GitHub Pages). OCR is performed by a Cloudflare Worker that securely stores API keys.",
+    uploadTitle: "1) Upload Image",
+    resultTitle: "2) Recognized Text",
+    chooseSource: "Choose source",
+    cameraHint: "On mobile, 'Take Photo' opens the camera. On desktop, both options may open file selection.",
+    choose: "Upload / Take Photo",
+    recognize: "Recognize",
+    clear: "Clear",
+    copy: "Copy",
+    download: "Download .txt",
+    cancel: "Cancel",
+    loadFiles: "Load from files",
+    takePhoto: "Take Photo",
+    qualityTipsTitle: "Quality tips:",
+    tip1: "keep image straight, no shadows or glare",
+    tip2: "high contrast (dark text on light background)",
+    tip3: "not too far (letters should be large)",
+    textareaPlaceholder: "Recognized text will appear here...",
+    languagesInfo: "Languages: RU / EN / FR / DE. OCR usually auto-detects language per line.",
+    selectedImage: "Selected image:",
+    clickRecognize: "Click 'Recognize'.",
+    sending: "Sending image to OCR…",
+    done: "Done ✅",
+    error: "OCR Error ❌",
+    copied: "Copied to clipboard.",
+    downloaded: "File downloaded."
+  }
+};
+
+function updateLanguage(lang) {
+  currentLang = lang;
+
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    if (translations[lang][key]) {
+      el.textContent = translations[lang][key];
+    }
+  });
+
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+    const key = el.getAttribute("data-i18n-placeholder");
+    if (translations[lang][key]) {
+      el.placeholder = translations[lang][key];
+    }
+  });
+
+  document.getElementById("langToggle").textContent =
+    lang === "ru" ? "EN" : "RU";
+}
+
+document.getElementById("langToggle").addEventListener("click", () => {
+  const newLang = currentLang === "ru" ? "en" : "ru";
+  updateLanguage(newLang);
+});
+
+// Инициализация
+updateLanguage("ru");
   </script>
 </body>
 </html>
